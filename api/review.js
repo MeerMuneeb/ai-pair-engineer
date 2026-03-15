@@ -44,7 +44,7 @@ ${code}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 8192,
         },
       }),
     });
@@ -58,6 +58,11 @@ ${code}
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
+
+    // Ensure scores are numbers (Gemini sometimes returns them as strings)
+    for (const key of ['readability', 'structure', 'maintainability']) {
+      if (parsed[key]) parsed[key].score = Number(parsed[key].score);
+    }
 
     return res.status(200).json(parsed);
   } catch (err) {
