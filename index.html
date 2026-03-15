@@ -237,7 +237,7 @@ async function runReview(){
   const btn=document.getElementById('reviewBtn');
   btn.disabled=true;
   document.getElementById('status').innerHTML='<span class="spinner"></span>Analyzing...';
-  document.getElementById('results').innerHTML=`<div class="empty-state"><span class="spinner" style="width:18px;height:18px;border-width:2px"></span><div style="margin-top:10px">Claude is reading your code...</div></div>`;
+  document.getElementById('results').innerHTML=`<div class="empty-state"><span class="spinner" style="width:18px;height:18px;border-width:2px"></span><div style="margin-top:10px">Analyzing your code...</div></div>`;
   try {
     const res=await fetch('/api/review',{
       method:'POST',
