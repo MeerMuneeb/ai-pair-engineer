@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Pair Engineer — Code Review Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --border2: #444c56;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --hint: #484f58;
+    --accent: #f0b429;
+    --accent-dim: rgba(240,180,41,0.12);
+    --blue: #58a6ff;
+    --blue-dim: rgba(88,166,255,0.1);
+    --green: #3fb950;
+    --green-dim: rgba(63,185,80,0.1);
+    --red: #f85149;
+    --red-dim: rgba(248,81,73,0.1);
+    --purple: #bc8cff;
+    --purple-dim: rgba(188,140,255,0.1);
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', system-ui, sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo-chip {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px; color: #000;
+    flex-shrink: 0;
+  }
+
+  .topbar-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .topbar-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  .api-badge {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 4px 10px;
+    background: var(--blue-dim);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 99px;
+    color: var(--blue);
+    font-weight: 500;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: calc(100vh - 57px);
+  }
+
+  .pane-left {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pane-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+  }
+
+  .pane-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .lang-select {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .lang-select:focus { border-color: var(--accent); }
+
+  .sample-btns { display: flex; gap: 6px; margin-left: auto; }
+
+  .sample-btn {
+    font-size: 11px;
+    padding: 4px 9px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: all 0.15s;
+  }
+
+  .sample-btn:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+
+  textarea#code {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    background: var(--bg);
+    border: none;
+    outline: none;
+    color: var(--text);
+    padding: 16px 20px;
+    resize: none;
+    min-height: 320px;
+  }
+
+  textarea#code::placeholder { color: var(--hint); }
+
+  .action-bar {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-review {
+    padding: 10px 22px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+
+  .btn-review:hover { opacity: 0.9; }
+  .btn-review:active { transform: scale(0.98); }
+  .btn-review:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-clear {
+    padding: 10px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-clear:hover { border-color: var(--border2); color: var(--text); }
+
+  .status-text { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .pane-right {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .results-wrap {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--hint);
+    font-size: 13px;
+    text-align: center;
+    gap: 10px;
+    padding: 40px 20px;
+  }
+
+  .empty-icon {
+    width: 48px; height: 48px;
+    background: var(--surface2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  /* Score header */
+  .score-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+  }
+
+  .score-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .overall-num { font-size: 36px; font-weight: 600; color: var(--text); line-height: 1; }
+  .overall-denom { font-size: 16px; color: var(--muted); }
+  .overall-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .export-btn {
+    font-size: 11px;
+    padding: 5px 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--sans);
+  }
+  .export-btn:hover { border-color: var(--border2); color: var(--text); }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+  .metric-cell {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+  }
+
+  .metric-label { font-size: 11px; color: var(--hint); margin-bottom: 3px; }
+  .metric-val { font-size: 22px; font-weight: 600; color: var(--text); }
+  .metric-val span { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .metric-sub { font-size: 11px; margin-top: 2px; }
+
+  /* Cards */
+  .review-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .card-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  .score-pill {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 99px;
+  }
+
+  .card-body { padding: 14px 16px; }
+  .card-body ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .card-body li { font-size: 13px; color: var(--muted); padding-left: 16px; position: relative; line-height: 1.55; }
+  .card-body li::before { content: "–"; position: absolute; left: 0; color: var(--hint); }
+  code { font-family: var(--mono); font-size: 11.5px; background: var(--surface2); padding: 1px 5px; border-radius: 4px; color: var(--blue); border: 1px solid var(--border); }
+
+  .pre-wrap {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.65;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    color: #e6edf3;
+    border: 1px solid var(--border);
+    margin-top: 10px;
+    white-space: pre;
+  }
+
+  .pos-card {
+    background: var(--green-dim);
+    border: 1px solid rgba(63,185,80,0.2);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+
+  .pos-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .pos-badge { background: var(--green-dim); border: 1px solid rgba(63,185,80,0.3); color: var(--green); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .pos-body { font-size: 13px; color: #8acc93; line-height: 1.6; }
+
+  .high { color: var(--green); }
+  .mid  { color: var(--accent); }
+  .low  { color: var(--red); }
+
+  .pill-high { background: var(--green-dim); border: 1px solid rgba(63,185,80,0.25); color: var(--green); }
+  .pill-mid  { background: var(--accent-dim); border: 1px solid rgba(240,180,41,0.25); color: var(--accent); }
+  .pill-low  { background: var(--red-dim);    border: 1px solid rgba(248,81,73,0.25);  color: var(--red); }
+
+  .icon-read    { background: var(--blue-dim);   color: var(--blue); }
+  .icon-struct  { background: var(--accent-dim); color: var(--accent); }
+  .icon-maint   { background: var(--red-dim);    color: var(--red); }
+  .icon-tests   { background: var(--purple-dim); color: var(--purple); }
+  .icon-refact  { background: rgba(139,200,255,0.1); color: #7dd3fc; }
+
+  .refact-desc { font-size: 13px; color: var(--muted); margin-bottom: 0; line-height: 1.6; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .pane-left { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-chip">PE</div>
+  <div>
+    <div class="topbar-title">AI Pair Engineer</div>
+    <div class="topbar-sub">Readability · Structure · Maintainability · Tests · Refactoring</div>
+  </div>
+  <span class="api-badge">Powered by Claude AI</span>
+</div>
+
+<div class="layout">
+  <!-- LEFT: Editor -->
+  <div class="pane-left">
+    <div class="pane-header">
+      <span class="pane-label">Input</span>
+      <select class="lang-select" id="lang">
+        <option value="javascript">JavaScript</option>
+        <option value="typescript">TypeScript</option>
+        <option value="python">Python</option>
+        <option value="java">Java</option>
+        <option value="go">Go</option>
+        <option value="rust">Rust</option>
+        <option value="csharp">C#</option>
+        <option value="php">PHP</option>
+        <option value="ruby">Ruby</option>
+      </select>
+      <div class="sample-btns">
+        <button class="sample-btn" onclick="loadSample('auth')">auth fn</button>
+        <button class="sample-btn" onclick="loadSample('fetch')">fetch util</button>
+        <button class="sample-btn" onclick="loadSample('sort')">sort algo</button>
+      </div>
+    </div>
+    <textarea id="code" placeholder="// Paste your code here...&#10;// Or load a sample with the buttons above."></textarea>
+    <div class="action-bar">
+      <button class="btn-review" id="reviewBtn" onclick="runReview()">Review Code</button>
+      <button class="btn-clear" onclick="clearAll()">Clear</button>
+      <span class="status-text" id="status">Ready</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="pane-right">
+    <div class="pane-header">
+      <span class="pane-label">Review Output</span>
+      <button class="export-btn" id="exportBtn" onclick="exportMd()" style="display:none;margin-left:auto;">Export .md</button>
+    </div>
+    <div class="results-wrap" id="results">
+      <div class="empty-state">
+        <div class="empty-icon">⌨</div>
+        <div>Paste code or load a sample<br>then click <strong>Review Code</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLES = {
+  auth: {
+    lang: 'javascript',
+    code: `async function login(req, res) {
+  var u = await db.find({email: req.body.email});
+  if(u.password == req.body.password) {
+    var t = jwt.sign({id: u._id}, 'secret123');
+    res.json({token: t, user: u});
+  } else {
+    res.status(401).json({msg: 'bad credentials'});
+  }
+}`
+  },
+  fetch: {
+    lang: 'javascript',
+    code: `function getData(url) {
+  return fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      console.log(data);
+      return data;
+    })
+    .catch(e => {
+      console.log('error', e);
+    })
+}`
+  },
+  sort: {
+    lang: 'python',
+    code: `def sort_users(users):
+  for i in range(len(users)):
+    for j in range(len(users)):
+      if users[i]['age'] < users[j]['age']:
+        temp = users[i]
+        users[i] = users[j]
+        users[j] = temp
+  return users`
+  }
+};
+
+function loadSample(k) {
+  const s = SAMPLES[k];
+  document.getElementById('code').value = s.code;
+  document.getElementById('lang').value = s.lang;
+  document.getElementById('status').textContent = 'Sample loaded';
+}
+
+function clearAll() {
+  document.getElementById('code').value = '';
+  document.getElementById('status').textContent = 'Ready';
+  document.getElementById('results').innerHTML = `<div class="empty-state"><div class="empty-icon">⌨</div><div>Paste code or load a sample<br>then click <strong>Review Code</strong></div></div>`;
+  document.getElementById('exportBtn').style.display = 'none';
+}
+
+function sc(n) { return n >= 7 ? 'high' : n >= 4 ? 'mid' : 'low'; }
+function pill(n) { return n >= 7 ? 'pill-high' : n >= 4 ? 'pill-mid' : 'pill-low'; }
+function lbl(n) { return n >= 8 ? 'Good' : n >= 6 ? 'Fair' : n >= 4 ? 'Needs work' : 'Poor'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderResults(d) {
+  const overall = Math.round((d.readability.score + d.structure.score + d.maintainability.score) / 3);
+  const li = arr => arr.map(i => `<li>${i}</li>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="score-header">
+      <div class="score-top">
+        <div>
+          <div class="overall-num">${overall}<span class="overall-denom">/10</span></div>
+          <div class="overall-label ${sc(overall)}">${lbl(overall)} · ${d.language}</div>
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          <div style="font-size:11px;color:var(--hint);">overall score</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:120px;height:4px;background:var(--surface2);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${overall*10}%;background:${overall>=7?'var(--green)':overall>=4?'var(--accent)':'var(--red)'};border-radius:99px;transition:width 0.6s;"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-cell">
+          <div class="metric-label">Readability</div>
+          <div class="metric-val ${sc(d.readability.score)}">${d.readability.score}<span>/10</span></div>
+          <div class="metric-sub ${sc(d.readability.score)}">${lbl(d.readability.score)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Structure</div>
+          <div class="metric-val ${sc(d.structure.score)}">${d.structure.score}<span>/10</span></div>
+          <div class="metric-sub ${sc(d.structure.score)}">${lbl(d.structure.score)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Maintainability</div>
+          <div class="metric-val ${sc(d.maintainability.score)}">${d.maintainability.score}<span>/10</span></div>
+          <div class="metric-sub ${sc(d.maintainability.score)}">${lbl(d.maintainability.score)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="review-card">
+      <div class="card-head"><div class="card-icon icon-read">R</div><div class="card-title">Readability</div><span class="score-pill ${pill(d.readability.score)}">${d.readability.score}/10</span></div>
+      <div class="card-body"><ul>${li(d.readability.issues)}</ul></div>
+    </div>
+
+    <div class="review-card">
+      <div class="card-head"><div class="card-icon icon-struct">S</div><div class="card-title">Structure &amp; Design</div><span class="score-pill ${pill(d.structure.score)}">${d.structure.score}/10</span></div>
+      <div class="card-body"><ul>${li(d.structure.issues)}</ul></div>
+    </div>
+
+    <div class="review-card">
+      <div class="card-head"><div class="card-icon icon-maint">M</div><div class="card-title">Maintainability</div><span class="score-pill ${pill(d.maintainability.score)}">${d.maintainability.score}/10</span></div>
+      <div class="card-body"><ul>${li(d.maintainability.issues)}</ul></div>
+    </div>
+
+    <div class="review-card">
+      <div class="card-head"><div class="card-icon icon-tests">T</div><div class="card-title">Proposed Tests</div></div>
+      <div class="card-body">
+        <ul>${li(d.tests)}</ul>
+        ${d.testSnippet ? `<pre class="pre-wrap">${esc(d.testSnippet)}</pre>` : ''}
+      </div>
+    </div>
+
+    <div class="review-card">
+      <div class="card-head"><div class="card-icon icon-refact">RF</div><div class="card-title">Refactored Version</div></div>
+      <div class="card-body">
+        <p class="refact-desc">${d.refactoring.description}</p>
+        <pre class="pre-wrap">${esc(d.refactoring.code)}</pre>
+      </div>
+    </div>
+
+    <div class="pos-card">
+      <div class="pos-head"><span class="pos-badge">+1 positive</span></div>
+      <div class="pos-body">${d.positive}</div>
+    </div>`;
+
+  window._lastReport = d;
+  document.getElementById('exportBtn').style.display = 'block';
+}
+
+async function runReview() {
+  const code = document.getElementById('code').value.trim();
+  if (!code) { document.getElementById('status').textContent = 'Paste some code first.'; return; }
+  const lang = document.getElementById('lang').value;
+  const btn = document.getElementById('reviewBtn');
+  btn.disabled = true;
+  document.getElementById('status').innerHTML = '<span class="spinner"></span>Analyzing...';
+  document.getElementById('results').innerHTML = `<div class="empty-state"><span class="spinner" style="width:18px;height:18px;border-width:2px;"></span><div style="margin-top:10px;">Claude is reading your code...</div></div>`;
+
+  const prompt = `You are an expert code reviewer. Analyze the following ${lang} code and respond with ONLY valid JSON (no markdown, no backticks, no explanation).
+
+Schema:
+{
+  "language": "detected language",
+  "readability":     { "score": <1-10>, "issues": ["...","...","..."] },
+  "structure":       { "score": <1-10>, "issues": ["...","...","..."] },
+  "maintainability": { "score": <1-10>, "issues": ["...","...","..."] },
+  "tests": ["...","...","..."],
+  "testSnippet": "short runnable test example (3-6 lines)",
+  "refactoring": { "description": "1-2 sentence summary", "code": "full refactored code" },
+  "positive": "one specific positive note referencing actual code"
+}
+
+Rules: 3 issues per dimension, specific and referencing actual variable/function names. Refactored code must be production-ready.
+
+Code:
+\`\`\`${lang}
+${code}
+\`\`\``;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const raw = await res.json();
+    const text = (raw.content || []).map(b => b.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    renderResults(JSON.parse(clean));
+    document.getElementById('status').textContent = 'Review complete';
+  } catch(e) {
+    document.getElementById('results').innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${e.message}</div>`;
+    document.getElementById('status').textContent = 'Error';
+    console.error(e);
+  }
+  btn.disabled = false;
+}
+
+function exportMd() {
+  const d = window._lastReport;
+  if (!d) return;
+  const overall = Math.round((d.readability.score + d.structure.score + d.maintainability.score) / 3);
+  let md = `# AI Pair Engineer — Code Review\n\n**Language:** ${d.language} | **Overall:** ${overall}/10\n\n`;
+  md += `| Dimension | Score |\n|---|---|\n`;
+  md += `| Readability | ${d.readability.score}/10 |\n| Structure | ${d.structure.score}/10 |\n| Maintainability | ${d.maintainability.score}/10 |\n\n`;
+  md += `## Readability\n${d.readability.issues.map(i=>`- ${i}`).join('\n')}\n\n`;
+  md += `## Structure\n${d.structure.issues.map(i=>`- ${i}`).join('\n')}\n\n`;
+  md += `## Maintainability\n${d.maintainability.issues.map(i=>`- ${i}`).join('\n')}\n\n`;
+  md += `## Proposed Tests\n${d.tests.map(i=>`- ${i}`).join('\n')}\n\n\`\`\`\n${d.testSnippet}\n\`\`\`\n\n`;
+  md += `## Refactoring\n${d.refactoring.description}\n\n\`\`\`\n${d.refactoring.code}\n\`\`\`\n\n`;
+  md += `## What you did well\n${d.positive}\n`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+  a.download = 'code-review.md';
+  a.click();
+}
+</script>
+</body>
+</html>
